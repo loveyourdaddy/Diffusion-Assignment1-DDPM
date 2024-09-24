@@ -86,7 +86,35 @@ class DDPMScheduler(BaseScheduler):
         ######## TODO ########
         # DO NOT change the code outside this part.
         # Assignment 1. Implement the DDPM reverse step.
-        sample_prev = None
+        
+        # Get the required constants for the current timestep
+        alpha_t = self._get_teeth(self.alphas, t)
+        alpha_t_bar = self._get_teeth(self.alphas_cumprod, t)
+        beta_t = self._get_teeth(self.betas, t)
+        
+        # Calculate the coefficients
+        coeff1 = torch.sqrt(1 / alpha_t)
+        coeff2 = (1 - alpha_t) / torch.sqrt(1 - alpha_t_bar)
+
+        # Calculate the mean of the distribution
+        mean = coeff1 * (x_t - coeff2 * eps_theta)
+
+        # Calculate the variance
+        if t > 0:
+            sigma_t = self._get_teeth(self.sigmas, t - 1)
+            variance = sigma_t ** 2
+        else:
+            variance = 0
+
+        # Sample from the distribution
+        noise = torch.randn_like(x_t)
+        if type(variance) is not torch.Tensor:
+            variance = torch.tensor(variance).to(x_t.device)
+        # print("x_t:", x_t)
+        # print("variance:", variance)
+        # print("mean:", mean)
+        sample_prev = mean + torch.sqrt(variance) * noise
+
         #######################
         
         return sample_prev
@@ -120,7 +148,19 @@ class DDPMScheduler(BaseScheduler):
         ######## TODO ########
         # DO NOT change the code outside this part.
         # Assignment 1. Implement the DDPM forward step.
-        x_t = None
+        # x_t = None
+        
+        # Ensure t is of type torch.int64
+        t = t.to(torch.int64)
+        # print(t.shape)
+        # t = t.view(-1).to(torch.int64)
+        # print(t.shape)
+        
+        alpha_cumprod_t = self._get_teeth(self.alphas_cumprod, t)
+        
+        # Calculate x_t using the forward process equation
+        x_t = torch.sqrt(alpha_cumprod_t) * x_0 + torch.sqrt(1 - alpha_cumprod_t) * eps
+        # eps이 랜덤이여도 괜찮나?
         #######################
 
         return x_t, eps
